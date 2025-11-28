@@ -1,0 +1,207 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: render-node
+  namespace: render-farm
+  labels:
+    app: render-node
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: render-node
+  template:
+    metadata:
+      labels:
+        app: render-node
+    spec:
+      initContainers:
+      # Init container
+      - name: scene-generator
+        image: linuxserver/blender:latest
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            echo "=========================================="
+            echo "Generating demo Blender scene..."
+            echo "=========================================="
+
+            # Create blender-scenes directory
+            mkdir -p /blender-scenes
+
+            # Check if scene already exists
+            if [ -f /blender-scenes/demo_scene.blend ]; then
+              echo "Scene already exists, skipping generation"
+              exit 0
+            fi
+
+            # Find Blender executable
+            if command -v blender &> /dev/null; then
+                BLENDER_CMD="blender"
+            elif [ -f "/usr/bin/blender" ]; then
+                BLENDER_CMD="/usr/bin/blender"
+            elif [ -f "/config/blender/blender" ]; then
+                BLENDER_CMD="/config/blender/blender"
+            else
+                echo "ERROR: Blender not found!"
+                exit 1
+            fi
+
+            echo "Using Blender: $BLENDER_CMD"
+            $BLENDER_CMD --version
+
+            # Run the scene generation script
+            echo "Creating scene with Python script..."
+            $BLENDER_CMD --background --python /scripts/create_demo_scene.py
+
+            # Verify scene was created
+            if [ -f /blender-scenes/demo_scene.blend ]; then
+              echo "Scene generated successfully!"
+              ls -lh /blender-scenes/demo_scene.blend
+            else
+              echo "Failed to generate scene"
+              exit 1
+            fi
+
+            echo "=========================================="
+        volumeMounts:
+        - name: render-config
+          mountPath: /scripts
+        - name: blender-scenes
+          mountPath: /blender-scenes
+        - name: render-output
+          mountPath: /render-output
+
+      containers:
+      - name: blender-renderer
+        image: linuxserver/blender:latest
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            echo "=========================================="
+            echo "Blender Render Node Started"
+            echo "=========================================="
+            echo "Hostname: $(hostname)"
+            echo "Pod IP: $(hostname -i)"
+            echo "Netbird IP: $(ip addr show wt0 2>/dev/null | grep 'inet ' | awk '{print $2}' || echo 'N/A')"
+            echo ""
+
+            # Install utilities if needed
+            apt-get update -qq && apt-get install -y -qq iproute2 iputils-ping curl > /dev/null 2>&1
+
+            # Find Blender executable
+            if command -v blender &> /dev/null; then
+                BLENDER_CMD="blender"
+            elif [ -f "/usr/bin/blender" ]; then
+                BLENDER_CMD="/usr/bin/blender"
+            elif [ -f "/config/blender/blender" ]; then
+                BLENDER_CMD="/config/blender/blender"
+            fi
+
+            echo "Blender executable: $BLENDER_CMD"
+            $BLENDER_CMD --version
+            echo ""
+
+            # Verify scene exists
+            if [ ! -f /blender-scenes/demo_scene.blend ]; then
+              echo "ERROR: Scene file not found!"
+              exit 1
+            fi
+            echo "✓ Scene file found: /blender-scenes/demo_scene.blend"
+            echo ""
+
+            # Wait for render jobs
+            echo "=========================================="
+            echo "Waiting for render jobs in /render-jobs/"
+            echo "Create a job file like: /render-jobs/render_1-30.job"
+            echo "Format: START_FRAME END_FRAME"
+            echo "Example: echo '1 30' > /render-jobs/render_1-30.job"
+            echo "=========================================="
+            echo ""
+
+            PROCESSED_JOBS=""
+
+            while true; do
+              # Check for job files
+              for job_file in /render-jobs/*.job; do
+                if [ -f "$job_file" ] && ! echo "$PROCESSED_JOBS" | grep -q "$job_file"; then
+                  echo ""
+                  echo "=========================================="
+                  echo "Found render job: $job_file"
+                  echo "=========================================="
+
+                  # Read frame range from job file
+                  read START_FRAME END_FRAME < "$job_file"
+
+                  echo "Frame range: $START_FRAME - $END_FRAME"
+                  echo ""
+
+                  # Execute render
+                  /scripts/render_frames.sh \
+                    /blender-scenes/demo_scene.blend \
+                    "$START_FRAME" \
+                    "$END_FRAME" \
+                    /render-output
+
+                  if [ $? -eq 0 ]; then
+                    echo "Render job completed successfully!"
+                    mv "$job_file" "${job_file}.done"
+                    PROCESSED_JOBS="$PROCESSED_JOBS $job_file"
+                  else
+                    echo "Render job failed!"
+                    mv "$job_file" "${job_file}.failed"
+                  fi
+
+                  echo "=========================================="
+                  echo ""
+                fi
+              done
+
+              # Status update
+              echo "[$(date '+%Y-%m-%d %H:%M:%S')] Render node $(hostname) waiting for jobs..."
+              sleep 30
+            done
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "1000m"
+          limits:
+            memory: "4Gi"
+            cpu: "4"
+        volumeMounts:
+        - name: render-config
+          mountPath: /scripts
+        - name: blender-scenes
+          mountPath: /blender-scenes
+        - name: render-output
+          mountPath: /render-output
+        - name: render-jobs
+          mountPath: /render-jobs
+
+      volumes:
+      - name: render-config
+        configMap:
+          name: render-config
+          defaultMode: 0755
+      - name: blender-scenes
+        emptyDir: {}
+      - name: render-output
+        persistentVolumeClaim:
+          claimName: render-output-pvc
+      - name: render-jobs
+        persistentVolumeClaim:
+          claimName: render-jobs-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: render-service
+  namespace: render-farm
+spec:
+  selector:
+    app: render-node
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 8080
+  type: ClusterIP

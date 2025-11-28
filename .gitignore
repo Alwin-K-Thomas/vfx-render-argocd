@@ -1,0 +1,18 @@
+# Kubernetes secrets and configs
+*.kubeconfig
+kubeconfig
+secrets/
+
+# Helm charts (if generated)
+charts/
+
+# ArgoCD generated files
+.argocd/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

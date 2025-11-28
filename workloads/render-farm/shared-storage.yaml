@@ -1,0 +1,62 @@
+---
+# PersistentVolume for render jobs
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: render-jobs-pv
+  namespace: render-farm
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: /mnt/render-jobs
+    type: DirectoryOrCreate
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+---
+# PersistentVolumeClaim for render jobs
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: render-jobs-pvc
+  namespace: render-farm
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-storage
+---
+# PersistentVolume for render output
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: render-output-pv
+  namespace: render-farm
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: /mnt/render-output
+    type: DirectoryOrCreate
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+---
+# PersistentVolumeClaim for render output
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: render-output-pvc
+  namespace: render-farm
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: local-storage

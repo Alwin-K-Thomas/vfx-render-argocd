@@ -1,0 +1,235 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: render-config
+  namespace: render-farm
+data:
+  create_demo_scene.py: |
+    #!/usr/bin/env python3
+    """
+    Simple Blender scene generator for render farm POC
+    Creates a rotating cube animation with camera and lighting
+    """
+    import bpy
+    import math
+
+    def create_demo_scene():
+        """Create a simple animated scene with rotating cubes"""
+
+        # Clear existing scene
+        bpy.ops.object.select_all(action='SELECT')
+        bpy.ops.object.delete()
+
+        # Remove existing cameras and lights
+        for obj in bpy.data.objects:
+            bpy.data.objects.remove(obj)
+
+        # Create camera
+        bpy.ops.object.camera_add(location=(7, -7, 5))
+        camera = bpy.context.active_object
+        camera.rotation_euler = (math.radians(63), 0, math.radians(45))
+        bpy.context.scene.camera = camera
+
+        # Create sun light
+        bpy.ops.object.light_add(type='SUN', location=(5, 5, 5))
+        sun = bpy.context.active_object
+        sun.data.energy = 2.0
+
+        # Create main cube (center, rotating)
+        bpy.ops.mesh.primitive_cube_add(size=2, location=(0, 0, 1))
+        cube_main = bpy.context.active_object
+        cube_main.name = "MainCube"
+
+        # Create material for main cube
+        mat_main = bpy.data.materials.new(name="MainMaterial")
+        mat_main.use_nodes = True
+        bsdf = mat_main.node_tree.nodes["Principled BSDF"]
+        bsdf.inputs['Base Color'].default_value = (0.8, 0.2, 0.2, 1)  # Red
+        bsdf.inputs['Metallic'].default_value = 0.5
+        bsdf.inputs['Roughness'].default_value = 0.3
+        cube_main.data.materials.append(mat_main)
+
+        # Create smaller orbiting cube
+        bpy.ops.mesh.primitive_cube_add(size=0.8, location=(3, 0, 1))
+        cube_orbit = bpy.context.active_object
+        cube_orbit.name = "OrbitCube"
+
+        # Create material for orbit cube
+        mat_orbit = bpy.data.materials.new(name="OrbitMaterial")
+        mat_orbit.use_nodes = True
+        bsdf_orbit = mat_orbit.node_tree.nodes["Principled BSDF"]
+        bsdf_orbit.inputs['Base Color'].default_value = (0.2, 0.2, 0.8, 1)  # Blue
+        bsdf_orbit.inputs['Metallic'].default_value = 0.7
+        bsdf_orbit.inputs['Roughness'].default_value = 0.2
+        cube_orbit.data.materials.append(mat_orbit)
+
+        # Create ground plane
+        bpy.ops.mesh.primitive_plane_add(size=10, location=(0, 0, 0))
+        plane = bpy.context.active_object
+        plane.name = "Ground"
+
+        # Create material for ground
+        mat_ground = bpy.data.materials.new(name="GroundMaterial")
+        mat_ground.use_nodes = True
+        bsdf_ground = mat_ground.node_tree.nodes["Principled BSDF"]
+        bsdf_ground.inputs['Base Color'].default_value = (0.8, 0.8, 0.8, 1)  # Gray
+        bsdf_ground.inputs['Roughness'].default_value = 0.7
+        plane.data.materials.append(mat_ground)
+
+        # Set up animation (60 frames)
+        scene = bpy.context.scene
+        scene.frame_start = 1
+        scene.frame_end = 60
+        scene.render.fps = 24
+
+        # Animate main cube rotation
+        cube_main.rotation_euler = (0, 0, 0)
+        cube_main.keyframe_insert(data_path="rotation_euler", frame=1)
+        cube_main.rotation_euler = (0, 0, math.radians(360))
+        cube_main.keyframe_insert(data_path="rotation_euler", frame=60)
+
+        # Animate orbiting cube (circular motion)
+        for frame in range(1, 61, 10):
+            angle = (frame / 60.0) * 2 * math.pi
+            x = 3 * math.cos(angle)
+            y = 3 * math.sin(angle)
+            cube_orbit.location = (x, y, 1)
+            cube_orbit.keyframe_insert(data_path="location", frame=frame)
+
+            # Also rotate the orbiting cube
+            cube_orbit.rotation_euler = (0, 0, angle)
+            cube_orbit.keyframe_insert(data_path="rotation_euler", frame=frame)
+
+        # Configure render settings
+        scene.render.engine = 'BLENDER_EEVEE'
+        scene.render.resolution_x = 1920
+        scene.render.resolution_y = 1080
+        scene.render.resolution_percentage = 50  # 50% for faster POC rendering
+        scene.render.image_settings.file_format = 'PNG'
+        scene.render.image_settings.color_mode = 'RGB'
+
+        # Set output path (will be overridden by render script)
+        scene.render.filepath = '/render-output/frame_'
+
+        # Enable ambient occlusion and bloom for better visuals
+        scene.eevee.use_gtao = True
+        scene.eevee.use_bloom = True
+        scene.eevee.bloom_intensity = 0.1
+
+        print("Demo scene created successfully!")
+        print(f"  - Frames: {scene.frame_start} to {scene.frame_end}")
+        print(f"  - Resolution: {scene.render.resolution_x}x{scene.render.resolution_y}")
+        print(f"  - Engine: {scene.render.engine}")
+
+        return scene
+
+    if __name__ == "__main__":
+        create_demo_scene()
+
+        # Save the scene
+        output_path = "/blender-scenes/demo_scene.blend"
+        bpy.ops.wm.save_as_mainfile(filepath=output_path)
+        print(f"Scene saved to: {output_path}")
+
+  render_frames.sh: |
+    #!/bin/bash
+    # Distributed Blender Render Script for Render Farm POC
+    # Usage: ./render_frames.sh <blend_file> <start_frame> <end_frame> <output_dir>
+
+    set -e
+
+    BLEND_FILE="${1:-/blender-scenes/demo_scene.blend}"
+    START_FRAME="${2:-1}"
+    END_FRAME="${3:-60}"
+    OUTPUT_DIR="${4:-/render-output}"
+
+    NODE_NAME=$(hostname)
+    TIMESTAMP=$(date '+%Y%m%d_%H%M%S')
+
+    echo "=========================================="
+    echo "Blender Distributed Render Node"
+    echo "=========================================="
+    echo "Node: $NODE_NAME"
+    echo "Timestamp: $TIMESTAMP"
+    echo "Blend File: $BLEND_FILE"
+    echo "Frame Range: $START_FRAME - $END_FRAME"
+    echo "Output Directory: $OUTPUT_DIR"
+    echo "=========================================="
+
+    # Check if Blender is available
+    if ! command -v blender &> /dev/null; then
+        echo "ERROR: Blender not found!"
+        echo "Attempting to locate Blender..."
+
+        # Try common Blender locations
+        if [ -f "/usr/bin/blender" ]; then
+            BLENDER_CMD="/usr/bin/blender"
+        elif [ -f "/usr/local/bin/blender" ]; then
+            BLENDER_CMD="/usr/local/bin/blender"
+        elif [ -f "/config/blender/blender" ]; then
+            BLENDER_CMD="/config/blender/blender"
+        else
+            echo "ERROR: Could not find Blender executable!"
+            exit 1
+        fi
+    else
+        BLENDER_CMD="blender"
+    fi
+
+    echo "Using Blender: $BLENDER_CMD"
+    $BLENDER_CMD --version
+
+    # Check if blend file exists
+    if [ ! -f "$BLEND_FILE" ]; then
+        echo "ERROR: Blend file not found: $BLEND_FILE"
+        echo "Available files in /blender-scenes/:"
+        ls -la /blender-scenes/ || echo "Directory not mounted"
+        exit 1
+    fi
+
+    # Create output directory if it doesn't exist
+    mkdir -p "$OUTPUT_DIR"
+
+    # Create node-specific output subdirectory
+    NODE_OUTPUT_DIR="$OUTPUT_DIR/$NODE_NAME"
+    mkdir -p "$NODE_OUTPUT_DIR"
+
+    echo ""
+    echo "Starting render..."
+    echo "Rendering frames $START_FRAME to $END_FRAME on node $NODE_NAME"
+    echo ""
+
+    # Render frames using Blender in background mode
+    $BLENDER_CMD -b "$BLEND_FILE" \
+        -noaudio \
+        -o "$NODE_OUTPUT_DIR/frame_####" \
+        -s $START_FRAME \
+        -e $END_FRAME \
+        -a \
+        -- --cycles-device CPU
+
+    RENDER_EXIT_CODE=$?
+
+    echo ""
+    echo "=========================================="
+    if [ $RENDER_EXIT_CODE -eq 0 ]; then
+        echo "Render completed successfully!"
+        echo "  Node: $NODE_NAME"
+        echo "  Frames: $START_FRAME - $END_FRAME"
+        echo "  Output: $NODE_OUTPUT_DIR"
+        echo ""
+
+        # List rendered frames
+        echo "Rendered frames:"
+        ls -lh "$NODE_OUTPUT_DIR/" | grep -E "frame_[0-9]+\.png" || echo "No frames found"
+
+        # Create success marker
+        echo "$NODE_NAME rendered frames $START_FRAME-$END_FRAME at $TIMESTAMP" > "$NODE_OUTPUT_DIR/render_complete.txt"
+
+    else
+        echo "Render failed with exit code: $RENDER_EXIT_CODE"
+        echo "  Node: $NODE_NAME"
+        exit $RENDER_EXIT_CODE
+    fi
+
+    echo "=========================================="
