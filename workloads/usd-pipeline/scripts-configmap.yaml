@@ -48,8 +48,9 @@ data:
 
         stage.SetStartTimeCode(1)
         stage.SetEndTimeCode(96)
-        character_xform.AddRotateYOp().Set(time=1, value=0)
-        character_xform.AddRotateYOp().Set(time=96, value=360)
+        rotate_op = character_xform.AddRotateYOp()
+        rotate_op.Set(time=1, value=0)
+        rotate_op.Set(time=96, value=360)
 
         stage.GetRootLayer().Save()
         print(f"Studio A: Character layer created")
