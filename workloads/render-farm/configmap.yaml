@@ -111,10 +111,8 @@ data:
         # Set output path (will be overridden by render script)
         scene.render.filepath = '/render-output/frame_'
 
-        # Enable ambient occlusion and bloom for better visuals
-        scene.eevee.use_gtao = True
-        scene.eevee.use_bloom = True
-        scene.eevee.bloom_intensity = 0.1
+        # Note: Blender 5.0+ has different EEVEE settings
+        # Removed deprecated settings for Blender 5.0 compatibility
 
         print("Demo scene created successfully!")
         print(f"  - Frames: {scene.frame_start} to {scene.frame_end}")
