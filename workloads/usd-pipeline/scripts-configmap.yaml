@@ -168,3 +168,70 @@ data:
 
     if __name__ == "__main__":
         compose_final_shot()
+
+  preview.py: |
+    #!/usr/bin/env python3
+    """Generate preview images from USD files"""
+    from pxr import Usd, UsdGeom, Gf, UsdAppUtils
+    import os
+
+    def generate_preview(usd_file, output_image, camera_distance=8, image_width=800, image_height=600):
+        """Generate a preview image from a USD file"""
+        print(f"Generating preview for {usd_file}...")
+
+        if not os.path.exists(usd_file):
+            print(f"USD file not found: {usd_file}")
+            return False
+
+        try:
+            # Open the USD stage
+            stage = Usd.Stage.Open(usd_file)
+            if not stage:
+                print(f"Failed to open USD stage: {usd_file}")
+                return False
+
+            # Use UsdAppUtils to render a frame
+            from pxr import UsdAppUtils
+
+            # Create a simple camera setup
+            renderer = UsdAppUtils.FrameRecorder()
+            renderer.SetImageWidth(image_width)
+            renderer.SetImageHeight(image_height)
+            renderer.SetComplexity(2.0)
+
+            # Record a single frame
+            renderer.Record(stage, Usd.TimeCode.Default(), output_image)
+
+            print(f"Preview saved to: {output_image}")
+            return True
+
+        except Exception as e:
+            print(f"Error generating preview: {e}")
+            # Fallback: create a simple placeholder text file
+            with open(output_image.replace('.png', '.txt'), 'w') as f:
+                f.write(f"Preview generation attempted for {usd_file}\n")
+                f.write(f"Note: Full USD rendering requires additional dependencies\n")
+            return False
+
+    if __name__ == "__main__":
+        import sys
+
+        # Generate previews for all USD files
+        usd_dir = "/usd-assets"
+
+        files_to_preview = [
+            ("studio_a_character.usda", "studio_a_preview.png"),
+            ("studio_b_environment.usda", "studio_b_preview.png"),
+            ("final_shot.usda", "final_shot_preview.png")
+        ]
+
+        for usd_file, preview_file in files_to_preview:
+            usd_path = os.path.join(usd_dir, usd_file)
+            preview_path = os.path.join(usd_dir, preview_file)
+
+            if os.path.exists(usd_path):
+                generate_preview(usd_path, preview_path)
+            else:
+                print(f"Skipping {usd_file} - file not found")
+
+        print("Preview generation complete!")

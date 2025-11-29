@@ -125,3 +125,45 @@ spec:
         - name: scripts
           configMap:
             name: usd-scripts
+---
+# Preview Generation Job Template
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: generate-previews
+  namespace: usd-pipeline
+  labels:
+    app: usd-pipeline
+    type: preview
+spec:
+  template:
+    metadata:
+      labels:
+        app: usd-pipeline
+        type: preview
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: usd-preview
+        image: python:3.11-slim
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            echo "Installing USD Python library..."
+            pip install --quiet usd-core pillow
+            echo "Generating USD preview images..."
+            python3 /scripts/preview.py
+            echo "Preview generation complete!"
+            ls -lh /usd-assets/*.png 2>/dev/null || echo "Note: Preview images may require additional rendering dependencies"
+        volumeMounts:
+          - name: usd-assets
+            mountPath: /usd-assets
+          - name: scripts
+            mountPath: /scripts
+      volumes:
+        - name: usd-assets
+          persistentVolumeClaim:
+            claimName: usd-assets-pvc
+        - name: scripts
+          configMap:
+            name: usd-scripts
