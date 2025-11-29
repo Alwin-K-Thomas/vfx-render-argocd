@@ -200,32 +200,34 @@ data:
                 })
 
             # Generate SVG visualization
-            svg = f'''<svg width="{image_width}" height="{image_height}" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="grad1" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#grad1)"/>
-  <text x="20" y="40" fill="#64ffda" font-size="24" font-family="monospace" font-weight="bold">USD Scene Preview</text>
-  <text x="20" y="70" fill="#a0a0a0" font-size="14" font-family="monospace">{os.path.basename(usd_file)}</text>
-  <line x1="20" y1="80" x2="780" y2="80" stroke="#64ffda" stroke-width="2"/>
-'''
+            svg_parts = [
+                f'<svg width="{image_width}" height="{image_height}" xmlns="http://www.w3.org/2000/svg">',
+                '  <rect width="100%" height="100%" fill="#1a1a2e"/>',
+                '  <text x="20" y="40" fill="#64ffda" font-size="24" font-family="monospace" font-weight="bold">USD Scene Preview</text>',
+                f'  <text x="20" y="70" fill="#a0a0a0" font-size="14" font-family="monospace">{os.path.basename(usd_file)}</text>',
+                '  <line x1="20" y1="80" x2="780" y2="80" stroke="#64ffda" stroke-width="2"/>'
+            ]
+            svg = '\n'.join(svg_parts) + '\n'
 
             y_pos = 110
             for i, prim in enumerate(prims[:20]):  # Limit to first 20 prims
                 indent = prim['level'] * 30
-                color = '#64ffda' if prim['level'] == 0 else '#a0a0a0' if prim['level'] == 1 else '#707070'
+                if prim['level'] == 0:
+                    color = '#64ffda'
+                elif prim['level'] == 1:
+                    color = '#a0a0a0'
+                else:
+                    color = '#707070'
+                prim_name = prim["path"].split("/")[-1] or "/"
                 svg += f'  <text x="{20 + indent}" y="{y_pos}" fill="{color}" font-size="12" font-family="monospace">'
-                svg += f'{"  " * prim["level"]}{prim["path"].split("/")[-1] or "/"} '
-                svg += f'<tspan fill="#ff6b6b">({prim["type"]})</tspan></text>\n'
+                svg += f'{prim_name} <tspan fill="#ff6b6b">({prim["type"]})</tspan></text>\n'
                 y_pos += 25
 
             if len(prims) > 20:
-                svg += f'  <text x="20" y="{y_pos}" fill="#a0a0a0" font-size="12" font-family="monospace" font-style="italic">... and {len(prims) - 20} more</text>\n'
+                remaining = len(prims) - 20
+                svg += f'  <text x="20" y="{y_pos}" fill="#a0a0a0" font-size="12" font-family="monospace">... and {remaining} more</text>\n'
 
-            svg += '</svg>'
+            svg += '</svg>\n'
 
             # Save SVG
             with open(output_image.replace('.png', '.svg'), 'w') as f:
