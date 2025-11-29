@@ -52,6 +52,7 @@ data:
         rotate_op.Set(time=1, value=0)
         rotate_op.Set(time=96, value=360)
 
+        stage.SetDefaultPrim(character_xform.GetPrim())
         stage.GetRootLayer().Save()
         print(f"Studio A: Character layer created")
         return output_path
@@ -120,6 +121,7 @@ data:
         stage.SetStartTimeCode(1)
         stage.SetEndTimeCode(96)
 
+        stage.SetDefaultPrim(env_xform.GetPrim())
         stage.GetRootLayer().Save()
         print(f"Studio B: Environment layer created")
         return output_path
