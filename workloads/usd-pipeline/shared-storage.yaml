@@ -1,0 +1,31 @@
+---
+# PersistentVolume for USD assets
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: usd-assets-pv
+  namespace: usd-pipeline
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteMany
+  hostPath:
+    path: /mnt/usd-assets
+    type: DirectoryOrCreate
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+---
+# PersistentVolumeClaim for USD assets
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: usd-assets-pvc
+  namespace: usd-pipeline
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-storage

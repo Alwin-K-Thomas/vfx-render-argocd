@@ -1,0 +1,127 @@
+---
+# Character Creation Job Template
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: studio-a-character
+  namespace: usd-pipeline
+  labels:
+    studio: studio-a
+    app: usd-pipeline
+spec:
+  template:
+    metadata:
+      labels:
+        studio: studio-a
+        app: usd-pipeline
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: usd-creator
+        image: python:3.11-slim
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            echo "Installing USD Python library..."
+            pip install --quiet usd-core
+            echo "Studio A: Creating character layer..."
+            python3 /scripts/studio-a.py
+            echo "Character layer created successfully!"
+            ls -lh /usd-assets/
+        volumeMounts:
+          - name: usd-assets
+            mountPath: /usd-assets
+          - name: scripts
+            mountPath: /scripts
+      volumes:
+        - name: usd-assets
+          persistentVolumeClaim:
+            claimName: usd-assets-pvc
+        - name: scripts
+          configMap:
+            name: usd-scripts
+---
+# Environment Creation Job Template
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: studio-b-environment
+  namespace: usd-pipeline
+  labels:
+    studio: studio-b
+    app: usd-pipeline
+spec:
+  template:
+    metadata:
+      labels:
+        studio: studio-b
+        app: usd-pipeline
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: usd-creator
+        image: python:3.11-slim
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            echo "Installing USD Python library..."
+            pip install --quiet usd-core
+            echo "Studio B: Creating environment layer..."
+            python3 /scripts/studio-b.py
+            echo "Environment layer created successfully!"
+            ls -lh /usd-assets/
+        volumeMounts:
+          - name: usd-assets
+            mountPath: /usd-assets
+          - name: scripts
+            mountPath: /scripts
+      volumes:
+        - name: usd-assets
+          persistentVolumeClaim:
+            claimName: usd-assets-pvc
+        - name: scripts
+          configMap:
+            name: usd-scripts
+---
+# Composition Job Template
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: compose-final-shot
+  namespace: usd-pipeline
+  labels:
+    app: usd-pipeline
+    type: composition
+spec:
+  template:
+    metadata:
+      labels:
+        app: usd-pipeline
+        type: composition
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: usd-composer
+        image: python:3.11-slim
+        command: ["/bin/bash", "-c"]
+        args:
+          - |
+            echo "Installing USD Python library..."
+            pip install --quiet usd-core
+            echo "Composing final shot from both studios..."
+            python3 /scripts/compose.py
+            echo "Final shot composition complete!"
+            echo "USD Files created:"
+            ls -lh /usd-assets/
+        volumeMounts:
+          - name: usd-assets
+            mountPath: /usd-assets
+          - name: scripts
+            mountPath: /scripts
+      volumes:
+        - name: usd-assets
+          persistentVolumeClaim:
+            claimName: usd-assets-pvc
+        - name: scripts
+          configMap:
+            name: usd-scripts

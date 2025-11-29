@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: usd-pipeline
+  labels:
+    name: usd-pipeline
+    app: vfx-collaboration

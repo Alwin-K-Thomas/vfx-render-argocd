@@ -1,0 +1,167 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: usd-scripts
+  namespace: usd-pipeline
+data:
+  studio-a.py: |
+    #!/usr/bin/env python3
+    """Studio A - Character and Props Layer"""
+    from pxr import Usd, UsdGeom, Gf
+
+    def create_character_layer(output_path="/usd-assets/studio_a_character.usda"):
+        stage = Usd.Stage.CreateNew(output_path)
+        stage.SetMetadata('comment', 'Studio A - Character Asset Layer')
+        UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.y)
+
+        character_xform = UsdGeom.Xform.Define(stage, '/Character')
+        character_xform.AddTranslateOp().Set(Gf.Vec3d(0, 1, 0))
+
+        body = UsdGeom.Cube.Define(stage, '/Character/Body')
+        body.CreateSizeAttr(1.0)
+        body.AddTranslateOp().Set(Gf.Vec3d(0, 0, 0))
+        body.CreateDisplayColorAttr([(0.2, 0.5, 0.8)])
+
+        head = UsdGeom.Sphere.Define(stage, '/Character/Head')
+        head.CreateRadiusAttr(0.4)
+        head.AddTranslateOp().Set(Gf.Vec3d(0, 0.8, 0))
+        head.CreateDisplayColorAttr([(0.3, 0.6, 0.9)])
+
+        left_arm = UsdGeom.Cylinder.Define(stage, '/Character/LeftArm')
+        left_arm.CreateRadiusAttr(0.15)
+        left_arm.CreateHeightAttr(1.2)
+        left_arm.AddTranslateOp().Set(Gf.Vec3d(-0.7, 0, 0))
+        left_arm.AddRotateXYZOp().Set(Gf.Vec3f(0, 0, 90))
+        left_arm.CreateDisplayColorAttr([(0.25, 0.55, 0.85)])
+
+        right_arm = UsdGeom.Cylinder.Define(stage, '/Character/RightArm')
+        right_arm.CreateRadiusAttr(0.15)
+        right_arm.CreateHeightAttr(1.2)
+        right_arm.AddTranslateOp().Set(Gf.Vec3d(0.7, 0, 0))
+        right_arm.AddRotateXYZOp().Set(Gf.Vec3f(0, 0, 90))
+        right_arm.CreateDisplayColorAttr([(0.25, 0.55, 0.85)])
+
+        tool = UsdGeom.Cube.Define(stage, '/Character/Tool')
+        tool.CreateSizeAttr(0.3)
+        tool.AddTranslateOp().Set(Gf.Vec3d(1.0, 0, 0))
+        tool.CreateDisplayColorAttr([(0.9, 0.7, 0.1)])
+
+        stage.SetStartTimeCode(1)
+        stage.SetEndTimeCode(96)
+        character_xform.AddRotateYOp().Set(time=1, value=0)
+        character_xform.AddRotateYOp().Set(time=96, value=360)
+
+        stage.GetRootLayer().Save()
+        print(f"Studio A: Character layer created")
+        return output_path
+
+    if __name__ == "__main__":
+        create_character_layer()
+
+  studio-b.py: |
+    #!/usr/bin/env python3
+    """Studio B - Environment and Lighting Layer"""
+    from pxr import Usd, UsdGeom, UsdLux, Gf
+
+    def create_environment_layer(output_path="/usd-assets/studio_b_environment.usda"):
+        stage = Usd.Stage.CreateNew(output_path)
+        stage.SetMetadata('comment', 'Studio B - Environment and Lighting Layer')
+        UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.y)
+
+        env_xform = UsdGeom.Xform.Define(stage, '/Environment')
+
+        ground = UsdGeom.Cube.Define(stage, '/Environment/Ground')
+        ground.CreateSizeAttr(1.0)
+        ground.AddScaleOp().Set(Gf.Vec3f(10, 0.1, 10))
+        ground.AddTranslateOp().Set(Gf.Vec3d(0, -0.05, 0))
+        ground.CreateDisplayColorAttr([(0.3, 0.3, 0.35)])
+
+        building1 = UsdGeom.Cube.Define(stage, '/Environment/Building1')
+        building1.CreateSizeAttr(1.0)
+        building1.AddScaleOp().Set(Gf.Vec3f(2, 4, 2))
+        building1.AddTranslateOp().Set(Gf.Vec3d(-4, 2, -3))
+        building1.CreateDisplayColorAttr([(0.5, 0.5, 0.55)])
+
+        building2 = UsdGeom.Cube.Define(stage, '/Environment/Building2')
+        building2.CreateSizeAttr(1.0)
+        building2.AddScaleOp().Set(Gf.Vec3f(1.5, 3, 1.5))
+        building2.AddTranslateOp().Set(Gf.Vec3d(3, 1.5, -2))
+        building2.CreateDisplayColorAttr([(0.45, 0.45, 0.5)])
+
+        platform = UsdGeom.Cylinder.Define(stage, '/Environment/Platform')
+        platform.CreateRadiusAttr(2.0)
+        platform.CreateHeightAttr(0.2)
+        platform.AddTranslateOp().Set(Gf.Vec3d(0, 0.1, 0))
+        platform.CreateDisplayColorAttr([(0.6, 0.4, 0.2)])
+
+        lights_xform = UsdGeom.Xform.Define(stage, '/Lights')
+
+        key_light = UsdLux.DistantLight.Define(stage, '/Lights/KeyLight')
+        key_light.CreateIntensityAttr(1000)
+        key_light.CreateColorAttr(Gf.Vec3f(1.0, 0.95, 0.9))
+        key_light.AddRotateXYZOp().Set(Gf.Vec3f(-45, 45, 0))
+
+        fill_light = UsdLux.DistantLight.Define(stage, '/Lights/FillLight')
+        fill_light.CreateIntensityAttr(400)
+        fill_light.CreateColorAttr(Gf.Vec3f(0.7, 0.8, 1.0))
+        fill_light.AddRotateXYZOp().Set(Gf.Vec3f(-30, -120, 0))
+
+        rim_light = UsdLux.DistantLight.Define(stage, '/Lights/RimLight')
+        rim_light.CreateIntensityAttr(600)
+        rim_light.CreateColorAttr(Gf.Vec3f(1.0, 0.9, 0.8))
+        rim_light.AddRotateXYZOp().Set(Gf.Vec3f(-60, 180, 0))
+
+        camera = UsdGeom.Camera.Define(stage, '/Camera')
+        camera.CreateFocalLengthAttr(50)
+        camera.AddTranslateOp().Set(Gf.Vec3d(3, 2, 5))
+        camera.AddRotateXYZOp().Set(Gf.Vec3f(-15, 20, 0))
+
+        stage.SetStartTimeCode(1)
+        stage.SetEndTimeCode(96)
+
+        stage.GetRootLayer().Save()
+        print(f"Studio B: Environment layer created")
+        return output_path
+
+    if __name__ == "__main__":
+        create_environment_layer()
+
+  compose.py: |
+    #!/usr/bin/env python3
+    """Final Shot Composition - Combines Studio A and Studio B layers"""
+    from pxr import Usd, UsdGeom
+    import os
+
+    def compose_final_shot(
+        character_layer="/usd-assets/studio_a_character.usda",
+        environment_layer="/usd-assets/studio_b_environment.usda",
+        output_path="/usd-assets/final_shot.usda"
+    ):
+        print("Composing final shot from multiple studio layers...")
+
+        stage = Usd.Stage.CreateNew(output_path)
+        stage.SetMetadata('comment', 'Final Shot - Composed from Studio A and Studio B')
+        UsdGeom.SetStageUpAxis(stage, UsdGeom.Tokens.y)
+
+        shot_xform = UsdGeom.Xform.Define(stage, '/Shot')
+
+        character_ref = stage.DefinePrim('/Shot/Character_Layer')
+        if os.path.exists(character_layer):
+            character_ref.GetReferences().AddReference(character_layer)
+            print(f"Referenced Studio A character layer")
+
+        env_ref = stage.DefinePrim('/Shot/Environment_Layer')
+        if os.path.exists(environment_layer):
+            env_ref.GetReferences().AddReference(environment_layer)
+            print(f"Referenced Studio B environment layer")
+
+        stage.SetStartTimeCode(1)
+        stage.SetEndTimeCode(96)
+        stage.SetDefaultPrim(shot_xform.GetPrim())
+
+        stage.GetRootLayer().Save()
+        print(f"Final shot composed successfully!")
+        return output_path
+
+    if __name__ == "__main__":
+        compose_final_shot()
